@@ -1,40 +1,26 @@
 {
-  "name": "SubTopo Engineering - Qibla Calculator",
+  "name": "SubTopo Engineering Qibla Calculator",
   "short_name": "SubTopo Qibla",
-  "description": "Calculateur de direction Qibla professionnel avec UTM Stakeout - SubTopo Engineering",
-  "start_url": "./index.html",
+  "description": "Calculateur professionnel de direction Qibla avec UTM Stakeout",
+  "start_url": "/Nasraoui-Fathi/index.html",
+  "scope": "/Nasraoui-Fathi/",
   "display": "standalone",
-  "orientation": "any",
+  "orientation": "portrait",
   "background_color": "#0a2e2a",
   "theme_color": "#10b981",
   "lang": "fr",
-  "dir": "ltr",
-  "scope": "./",
   "icons": [
     {
-      "src": "icons/icon-192.png",
+      "src": "https://topomarine1-lab.github.io/Nasraoui-Fathi/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
-      "src": "icons/icon-512.png",
+      "src": "https://topomarine1-lab.github.io/Nasraoui-Fathi/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
-  ],
-  "categories": ["utilities", "navigation", "productivity", "business"]
+  ]
 }
