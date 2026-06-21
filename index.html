@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="fr" id="htmlRoot">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#10b981">
+<title>Qibla Direction Calculator</title>
+
+<!-- PWA Installation -->
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Qibla Pro">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-192.png">
+
+<!-- Bibliothèques -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/proj4@2.9.0/dist/proj4.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+:root {
+  --bg-darkest:#071f1c; --bg-dark:#0a2e2a; --bg-card:#0f3a35; --bg-card-2:#0d342f;
+  --border:#1a5f56; --border-light:#2a7d72;
+  --emerald:#10b981; --emerald-light:#34d399; --emerald-dark:#059669;
+  --text:#ffffff; --text-soft:#a7f3d0; --text-mute:#6ee7b7; --danger:#ef4444;
+}
+body {
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg-darkest); min-height:100vh; color:var(--text); overflow-x:hidden;
+}
+body.rtl { direction:rtl; }
+
+/* LOGIN */
+#loginOverlay {
+  position:fixed; inset:0; z-index:9999;
+  background:linear-gradient(135deg,#071f1c 0%,#0a2e2a 50%,#071f1c 100%);
+  display:flex; align-items:center; justify-content:center; padding:20px;
+}
+#loginOverlay.hidden { display:none; }
+.login-box {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:20px; padding:40px 30px; max-width:400px; width:100%;
+  box-shadow:0 20px 60px rgba(0,0,0,.5); text-align:center;
+}
+.login-logo {
+  width:80px; height:80px; border-radius:20px; margin:0 auto 20px;
+  background:linear-gradient(135deg,#fff,#e8f5e9);
+  display:flex; align-items:center; justify-content:center; font-size:46px;
+  box-shadow:0 8px 24px rgba(16,185,129,.3); overflow:hidden;
+}
+.login-logo img { width:100%; height:100%; object-fit:cover; }
+.login-title { font-size:22px; font-weight:800; margin-bottom:8px; }
+.login-sub { font-size:13px; color:var(--text-soft); margin-bottom:30px; }
+.login-box input {
+  width:100%; padding:14px 16px; background:var(--bg-dark); color:#fff;
+  border:1px solid var(--border); border-radius:12px;
+  font-size:15px; margin-bottom:12px; text-align:center; letter-spacing:3px;
+}
+.login-box input:focus {
+  outline:none; border-color:var(--emerald);
+  box-shadow:0 0 0 3px rgba(16,185,129,.2);
+}
+.login-btn {
+  width:100%; padding:14px; border:none; border-radius:12px;
+  background:linear-gradient(135deg,var(--emerald),var(--emerald-dark));
+  color:#fff; font-weight:700; font-size:15px; cursor:pointer;
+  transition:all .3s; letter-spacing:1px;
+}
+.login-btn:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(16,185,129,.4); }
+.login-error { color:var(--danger); font-size:13px; margin-top:10px; min-height:18px; }
+.login-footer {
+  margin-top:24px; padding-top:20px; border-top:1px solid var(--border);
+  font-size:11px; color:var(--text-mute);
+}
+.lang-select { display:flex; gap:6px; justify-content:center; margin-bottom:20px; }
+.lang-btn {
+  background:var(--bg-dark); border:1px solid var(--border);
+  color:var(--text-soft); padding:6px 14px; border-radius:8px;
+  font-size:12px; cursor:pointer; font-weight:600;
+}
+.lang-btn.active { background:var(--emerald); color:#fff; border-color:var(--emerald); }
+
+/* HEADER */
+header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 20px; background:var(--bg-dark);
+  border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100;
+}
+.logo { display:flex; align-items:center; gap:12px; }
+.logo-icon {
+  width:46px; height:46px; border-radius:12px; overflow:hidden;
+  background:linear-gradient(135deg,#fff,#d1fae5);
+  display:flex; align-items:center; justify-content:center; font-size:26px;
+  box-shadow:0 4px 12px rgba(16,185,129,.3);
+}
+.logo-icon img { width:100%; height:100%; object-fit:cover; }
+.logo-text h1 { font-size:17px; font-weight:800; color:#fff; }
+.logo-text p { font-size:11px; color:var(--text-soft); margin-top:2px; }
+.header-right { display:flex; align-items:center; gap:8px; }
+.developer-badge {
+  background:var(--bg-card); border:1px solid var(--border);
+  padding:8px 14px; border-radius:20px; font-size:11px; text-align:right;
+}
+.developer-badge .by { color:var(--text-soft); font-size:10px; }
+.developer-badge .name { color:var(--emerald-light); font-weight:700; font-size:12px; }
+.icon-btn {
+  background:transparent; border:1px solid var(--border);
+  color:var(--text-soft); padding:8px 10px; border-radius:8px;
+  font-size:13px; cursor:pointer;
+}
+.icon-btn:hover { background:var(--bg-card); color:#fff; }
+
+/* TABS */
+.tabs {
+  display:flex; background:var(--bg-dark);
+  border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:none;
+}
+.tabs::-webkit-scrollbar { display:none; }
+.tab {
+  flex:1; min-width:90px; padding:14px 8px; border:none; background:transparent;
+  color:var(--text-soft); font-size:12px; font-weight:600;
+  cursor:pointer; transition:all .3s;
+  display:flex; align-items:center; justify-content:center; gap:4px;
+  border-bottom:2px solid transparent;
+}
+.tab:hover { color:#fff; background:rgba(16,185,129,.05); }
+.tab.active {
+  color:var(--emerald-light); border-bottom-color:var(--emerald);
+  background:rgba(16,185,129,.08);
+}
+
+/* PANELS */
+.panel { display:none; padding:16px; animation:fadeIn .3s; }
+.panel.active { display:block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+.card {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:14px; padding:20px; margin-bottom:16px;
+}
+.card-title {
+  font-size:12px; font-weight:700; color:var(--emerald-light);
+  text-transform:uppercase; letter-spacing:2px; margin-bottom:16px;
+}
+
+.segment {
+  display:flex; margin-bottom:18px; background:var(--bg-dark);
+  border-radius:10px; padding:0; border:1px solid var(--border);
+}
+.segment button {
+  flex:1; padding:14px; border:none; background:transparent;
+  color:var(--text-soft); font-weight:600; cursor:pointer;
+  transition:all .3s; font-size:14px; border-radius:8px;
+}
+.segment button.active { background:var(--emerald); color:#fff; }
+
+.field { margin-bottom:14px; }
+label {
+  display:block; font-size:11px; font-weight:700; color:var(--emerald-light);
+  text-transform:uppercase; letter-spacing:1.5px; margin-bottom:8px;
+}
+input,select {
+  width:100%; padding:14px 16px; background:var(--bg-dark); color:#fff;
+  border:1px solid var(--border); border-radius:10px;
+  font-size:15px; font-weight:500; transition:all .3s;
+}
+input:focus,select:focus {
+  outline:none; border-color:var(--emerald);
+  box-shadow:0 0 0 3px rgba(16,185,129,.15);
+}
+input::placeholder { color:rgba(167,243,208,.3); }
+select option { background:var(--bg-dark); }
+.row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media (max-width:600px){ .row { grid-template-columns:1fr; } }
+
+.btn {
+  width:100%; padding:16px; border:none; border-radius:10px;
+  font-size:15px; font-weight:700; cursor:pointer; transition:all .3s;
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  margin-top:8px; letter-spacing:.3px;
+}
+.btn-primary { background:var(--emerald); color:#fff; }
+.btn-primary:hover { background:var(--emerald-dark); }
+.btn-outline { background:transparent; color:#fff; border:1px solid var(--border); }
+.btn-outline:hover { background:var(--bg-card-2); border-color:var(--emerald); }
+.btn:active { transform:scale(.98); }
+.btn-sm { padding:10px 14px; font-size:13px; }
+
+.result-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
+.result-item {
+  background:var(--bg-card-2); padding:14px; border-radius:10px;
+  border-left:3px solid var(--emerald);
+}
+.result-item.full { grid-column:1/-1; }
+.result-label {
+  font-size:10px; color:var(--emerald-light); text-transform:uppercase;
+  letter-spacing:1.5px; margin-bottom:4px; font-weight:700;
+}
+.result-value { font-size:18px; font-weight:800; color:#fff; }
+.result-sub { font-size:12px; color:var(--text-soft); margin-top:2px; }
+
+.qibla-big {
+  text-align:center; padding:30px 20px;
+  background:linear-gradient(135deg,var(--bg-card-2),rgba(16,185,129,.1));
+  border-radius:14px; margin-bottom:16px; border:1px solid var(--emerald);
+}
+.qibla-angle {
+  font-size:64px; font-weight:900; color:var(--emerald-light);
+  line-height:1; text-shadow:0 0 30px rgba(16,185,129,.4);
+}
+.qibla-label {
+  font-size:13px; color:var(--text-soft); margin-top:10px;
+  text-transform:uppercase; letter-spacing:3px; font-weight:700;
+}
+
+.compass-wrap { position:relative; width:300px; height:300px; margin:30px auto; }
+.compass-disc {
+  width:100%; height:100%; border-radius:50%;
+  background:radial-gradient(circle at 30% 30%,#fff,#d1fae5);
+  box-shadow:0 0 0 6px var(--bg-dark),0 0 0 10px var(--emerald),0 20px 60px rgba(0,0,0,.5);
+  position:relative; transition:transform .2s ease-out;
+}
+.compass-letter {
+  position:absolute; font-size:24px; font-weight:900;
+  color:var(--bg-darkest); font-family:Georgia,serif;
+}
+.compass-letter.N { top:14px; left:50%; transform:translateX(-50%); color:var(--danger); }
+.compass-letter.S { bottom:14px; left:50%; transform:translateX(-50%); }
+.compass-letter.E { right:14px; top:50%; transform:translateY(-50%); }
+.compass-letter.W { left:14px; top:50%; transform:translateY(-50%); }
+.qibla-arrow {
+  position:absolute; left:50%; top:50%; width:60px; height:60px;
+  transform:translate(-50%,-180px); transform-origin:50% 180px;
+  transition:transform .5s ease-out;
+  display:flex; align-items:center; justify-content:center;
+  font-size:40px; filter:drop-shadow(0 4px 12px rgba(16,185,129,.6));
+}
+.compass-center {
+  position:absolute; left:50%; top:50%; width:24px; height:24px;
+  background:radial-gradient(circle,var(--emerald-light),var(--bg-darkest));
+  border-radius:50%; transform:translate(-50%,-50%);
+  box-shadow:0 2px 8px rgba(0,0,0,.5);
+}
+.heading-info {
+  text-align:center; margin-top:20px; padding:16px;
+  background:var(--bg-card-2); border-radius:10px; border:1px solid var(--border);
+}
+.heading-value { font-size:36px; font-weight:900; color:var(--emerald-light); }
+.heading-label { font-size:12px; color:var(--text-soft); text-transform:uppercase; letter-spacing:2px; margin-top:4px; }
+
+.status { padding:12px 16px; border-radius:10px; margin-top:12px;
+  display:flex; align-items:center; gap:10px; font-size:13px; }
+.status-success { background:rgba(16,185,129,.15); border:1px solid var(--emerald); color:var(--emerald-light); }
+.status-warning { background:rgba(239,68,68,.1); border:1px solid var(--danger); color:#fca5a5; }
+
+#mapView { height:500px; border-radius:14px; overflow:hidden; border:1px solid var(--border); }
+.leaflet-container { background:var(--bg-dark); }
+
+.stakeout-table {
+  width:100%; border-collapse:collapse; margin-top:14px;
+  background:var(--bg-card-2); border-radius:10px; overflow:hidden; font-size:12px;
+}
+.stakeout-table th {
+  background:var(--bg-dark); padding:10px 6px; text-align:center;
+  font-size:10px; text-transform:uppercase; letter-spacing:1px;
+  color:var(--emerald-light); border-bottom:2px solid var(--emerald);
+}
+.stakeout-table td {
+  padding:10px 6px; text-align:center; border-bottom:1px solid var(--border);
+  color:#fff; font-family:'Courier New',monospace;
+}
+.stakeout-table tr:hover td { background:rgba(16,185,129,.05); }
+.stakeout-table tr:first-child td { background:rgba(16,185,129,.12); font-weight:bold; }
+
+.info-row {
+  display:flex; justify-content:space-between; padding:10px 14px;
+  background:var(--bg-card-2); border-radius:8px; margin-bottom:6px;
+  font-size:13px; border:1px solid var(--border);
+}
+.info-row b { color:var(--emerald-light); }
+.info-row span { color:#fff; font-family:'Courier New',monospace; }
+
+.empty { text-align:center; padding:40px 20px; color:var(--text-soft); }
+.empty span { font-size:60px; display:block; margin-bottom:12px; opacity:.4; }
+
+.toast {
+  position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(100px);
+  background:var(--bg-card); color:#fff; padding:14px 24px; border-radius:10px;
+  box-shadow:0 8px 24px rgba(0,0,0,.6); border:1px solid var(--emerald);
+  z-index:1000; transition:transform .4s; font-weight:600; font-size:14px;
+}
+.toast.show { transform:translateX(-50%) translateY(0); }
+
+footer {
+  text-align:center; padding:16px; font-size:11px; color:var(--text-soft);
+  opacity:.7; border-top:1px solid var(--border); margin-top:20px;
+}
+
+/* SETTINGS MODAL */
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:9998;
+  display:none; align-items:center; justify-content:center; padding:20px;
+}
+.modal-overlay.show { display:flex; }
+.modal {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:16px; padding:24px; max-width:500px; width:100%;
+  max-height:90vh; overflow-y:auto;
+}
+.modal-title {
+  font-size:16px; font-weight:800; color:var(--emerald-light);
+  margin-bottom:20px; text-transform:uppercase; letter-spacing:2px;
+  border-bottom:1px solid var(--border); padding-bottom:12px;
+}
+.logo-preview {
+  width:80px; height:80px; border-radius:12px; margin:0 auto 16px;
+  background:#fff; display:flex; align-items:center; justify-content:center;
+  overflow:hidden; border:2px dashed var(--border);
+}
+.logo-preview img { width:100%; height:100%; object-fit:cover; }
+.file-input-wrapper { position:relative; overflow:hidden; display:inline-block; width:100%; }
+.file-input-wrapper input[type=file] { position:absolute; left:-9999px; }
+.file-input-label {
+  display:block; padding:12px; background:var(--bg-dark);
+  border:1px dashed var(--border); border-radius:10px;
+  text-align:center; cursor:pointer; color:var(--text-soft);
+  transition:all .3s;
+}
+.file-input-label:hover { border-color:var(--emerald); color:#fff; }
+
+/* INSTALL BANNER */
+#installBanner {
+  display:none; position:fixed; bottom:20px; left:20px; right:20px;
+  background:linear-gradient(135deg,#10b981,#059669); color:#fff;
+  padding:16px 20px; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,.4);
+  z-index:9997; align-items:center; justify-content:space-between; gap:12px;
+}
+#installBanner.show { display:flex; }
+.install-text { flex:1; }
+.install-text-title { font-weight:700; font-size:14px; }
+.install-text-sub { font-size:11px; opacity:.9; margin-top:2px; }
+.install-actions { display:flex; gap:8px; }
+.btn-install {
+  background:#fff; color:#0a2e2a; border:none; padding:10px 16px;
+  border-radius:8px; font-weight:700; font-size:13px; cursor:pointer;
+}
+.btn-dismiss {
+  background:transparent; color:#fff; border:1px solid rgba(255,255,255,.4);
+  padding:10px 14px; border-radius:8px; font-size:13px; cursor:pointer;
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginOverlay">
+  <div class="login-box">
+    <div class="login-logo" id="loginLogo">🧭</div>
+    <div class="login-title" data-i18n="appTitle">Qibla Direction Calculator</div>
+    <div class="login-sub" data-i18n="loginSub">Accès protégé — Veuillez saisir le mot de passe</div>
+    <div class="lang-select">
+      <button class="lang-btn active" data-lang="fr" onclick="setLang('fr')">🇫🇷 FR</button>
+      <button class="lang-btn" data-lang="en" onclick="setLang('en')">🇬🇧 EN</button>
+      <button class="lang-btn" data-lang="ar" onclick="setLang('ar')">🇸🇦 AR</button>
+    </div>
+    <input type="password" id="pwdInput" placeholder="••••••••••" autocomplete="off">
+    <button class="login-btn" onclick="tryLogin()"><span data-i18n="loginBtn">🔓 SE CONNECTER</span></button>
+    <div class="login-error" id="pwdError"></div>
+    <div class="login-footer">© 2025 Developed by <b style="color:var(--emerald-light)">NASRAOUI FATHI</b></div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-title" data-i18n="settings">⚙️ Paramètres</div>
+    <div class="field">
+      <label data-i18n="companyLogo">Logo société (apparaît dans le PDF)</label>
+      <div class="logo-preview" id="logoPreview">📷</div>
+      <div class="file-input-wrapper">
+        <label for="logoFile" class="file-input-label" data-i18n="uploadLogo">📤 Cliquer pour uploader un logo</label>
+        <input type="file" id="logoFile" accept="image/*">
+      </div>
+    </div>
+    <div class="field">
+      <label data-i18n="companyName">Nom de la société</label>
+      <input type="text" id="companyName" placeholder="Ex: SUBTOPO Engineering">
+    </div>
+    <div class="field">
+      <label data-i18n="companyInfo">Informations société</label>
+      <input type="text" id="companyInfo" placeholder="Ex: Tunis - +216 12 345 678">
+    </div>
+    <div class="field">
+      <label data-i18n="lang">🌍 Langue</label>
+      <select id="langSelect" onchange="setLang(this.value)">
+        <option value="fr">🇫🇷 Français</option>
+        <option value="en">🇬🇧 English</option>
+        <option value="ar">🇸🇦 العربية</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="saveSettings()"><span data-i18n="save">💾 Sauvegarder</span></button>
+    <button class="btn btn-outline" onclick="closeSettings()"><span data-i18n="close">✖️ Fermer</span></button>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon" id="headerLogo">🧭</div>
+    <div class="logo-text">
+      <h1 data-i18n="appTitle">Qibla Direction Calculator</h1>
+      <p data-i18n="appSubtitle">Great Circle Bearing · UTM Field Stakeout</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="developer-badge">
+      <div class="by" data-i18n="developedBy">Developed by</div>
+      <div class="name">NASRAOUI FATHI</div>
+    </div>
+    <button class="icon-btn" onclick="openSettings()" title="Settings">⚙️</button>
+    <button class="icon-btn" onclick="logout()" title="Quitter">🚪</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="input">📍 <span data-i18n="tabInput">Input</span></button>
+  <button class="tab" data-tab="result">📐 <span data-i18n="tabResult">Result</span></button>
+  <button class="tab" data-tab="map">🗺️ <span data-i18n="tabMap">Map</span></button>
+  <button class="tab" data-tab="stakeout">📏 <span data-i18n="tabStakeout">Stakeout</span></button>
+  <button class="tab" data-tab="compass">🧭 <span data-i18n="tabCompass">Compass</span></button>
+  <button class="tab" data-tab="export">📤 <span data-i18n="tabExport">Export</span></button>
+</nav>
+
+<!-- INPUT -->
+<section id="input" class="panel active">
+  <div class="card">
+    <div class="card-title" data-i18n="measurePoint">Measurement Point Coordinates</div>
+    <div class="segment">
+      <button id="modeXY" class="active" data-i18n="modeXY">X, Y (metric)</button>
+      <button id="modeGPS" data-i18n="modeGPS">GPS (Lat / Lng)</button>
+    </div>
+    <div id="utmFields">
+      <div class="row">
+        <div class="field"><label>X — Easting (m)</label>
+          <input type="number" id="easting" step="0.001" placeholder="368838.270"></div>
+        <div class="field"><label>Y — Northing (m)</label>
+          <input type="number" id="northing" step="0.001" placeholder="3355642.896"></div>
+      </div>
+      <div class="field"><label data-i18n="projection">Projection System</label>
+        <select id="utmZone">
+          <option value="30N">UTM Zone 30N</option><option value="31N">UTM Zone 31N</option>
+          <option value="32N">UTM Zone 32N</option><option value="33N">UTM Zone 33N</option>
+          <option value="34N" selected>UTM Zone 34N</option>
+          <option value="35N">UTM Zone 35N</option><option value="36N">UTM Zone 36N</option>
+          <option value="37N">UTM Zone 37N</option><option value="38N">UTM Zone 38N</option>
+          <option value="39N">UTM Zone 39N</option><option value="40N">UTM Zone 40N</option>
+        </select></div>
+    </div>
+    <div id="gpsFields" style="display:none;">
+      <div class="row">
+        <div class="field"><label>Latitude (°)</label>
+          <input type="number" id="lat" step="0.000001" placeholder="36.806495"></div>
+        <div class="field"><label>Longitude (°)</label>
+          <input type="number" id="lng" step="0.000001" placeholder="10.181532"></div>
+      </div>
+    </div>
+    <div class="field"><label data-i18n="siteName">Point Name / Site Name</label>
+      <input type="text" id="siteName" placeholder="ex: Building NE corner — Site A"></div>
+    <button class="btn btn-primary" id="gpsBtn">⊕ <span data-i18n="captureGPS">Capture GPS automatically</span></button>
+    <button class="btn btn-outline" id="calcBtn">⊞ <span data-i18n="calculate">Calculate Qibla Direction</span></button>
+  </div>
+</section>
+
+<!-- RESULT -->
+<section id="result" class="panel">
+  <div id="resultContent">
+    <div class="card"><div class="empty"><span>📐</span><p data-i18n="noCalc">Aucun calcul effectué</p>
+      <p style="font-size:12px; margin-top:8px;" data-i18n="enterCoords">Saisissez vos coordonnées dans Input</p></div></div>
+  </div>
+</section>
+
+<!-- MAP -->
+<section id="map" class="panel">
+  <div class="card">
+    <div class="card-title">🗺️ <span data-i18n="mapTitle">Carte interactive Qibla</span></div>
+    <div id="mapView"></div>
+    <div style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <button class="btn btn-primary btn-sm" onclick="recenterMap()">🎯 <span data-i18n="recenter">Recentrer</span></button>
+      <button class="btn btn-outline btn-sm" onclick="toggleSatellite()">🛰️ <span data-i18n="satellite">Satellite/Carte</span></button>
+    </div>
+  </div>
+</section>
+
+<!-- STAKEOUT -->
+<section id="stakeout" class="panel">
+  <div class="card">
+    <div class="card-title">📏 <span data-i18n="stakeoutTitle">Ligne d'implantation Qibla</span></div>
+    <div class="row">
+      <div class="field"><label data-i18n="lineLength">Longueur ligne (m)</label>
+        <input type="number" id="stakeLength" value="50" min="5" max="500" step="5"></div>
+      <div class="field"><label data-i18n="stakeSpacing">Espacement piquets (m)</label>
+        <input type="number" id="stakeStep" value="5" min="1" max="50" step="1"></div>
+    </div>
+    <button class="btn btn-primary" onclick="generateStakeout()">📐 <span data-i18n="generateStakeout">Générer Stakeout</span></button>
+    <div id="stakeoutResult"></div>
+  </div>
+</section>
+
+<!-- COMPASS -->
+<section id="compass" class="panel">
+  <div class="card">
+    <div class="card-title">🧭 <span data-i18n="compassTitle">Boussole Qibla en temps réel</span></div>
+    <div class="compass-wrap">
+      <div class="compass-disc" id="compassDisc">
+        <div class="compass-letter N">N</div><div class="compass-letter S">S</div>
+        <div class="compass-letter E">E</div><div class="compass-letter W">W</div>
+      </div>
+      <div class="qibla-arrow" id="qiblaArrow">🕋</div>
+      <div class="compass-center"></div>
+    </div>
+    <div class="heading-info">
+      <div class="heading-value" id="headingValue">--°</div>
+      <div class="heading-label" data-i18n="currentHeading">Heading actuel</div>
+    </div>
+    <button class="btn btn-primary" id="enableCompass">🔓 <span data-i18n="enableCompass">Activer la boussole</span></button>
+    <div id="compassStatus"></div>
+  </div>
+</section>
+
+<!-- EXPORT -->
+<section id="export" class="panel">
+  <div class="card">
+    <div class="card-title">📤 <span data-i18n="exportTitle">Export des résultats</span></div>
+    <button class="btn btn-primary" onclick="exportData('pdf')">📑 <span data-i18n="exportPDF">Export PDF (avec carte)</span></button>
+    <button class="btn btn-primary" onclick="exportData('dxf')">📐 <span data-i18n="exportDXF">Export DXF (AutoCAD)</span></button>
+    <button class="btn btn-primary" onclick="exportData('kml')">🌍 <span data-i18n="exportKML">Export KML (Google Earth)</span></button>
+    <button class="btn btn-primary" onclick="exportData('csv')">📊 <span data-i18n="exportCSV">Export CSV (Excel)</span></button>
+    <button class="btn btn-outline" onclick="exportData('txt')">📋 <span data-i18n="exportTXT">Rapport texte</span></button>
+  </div>
+  <div class="card">
+    <div class="card-title">ℹ️ <span data-i18n="formatsTitle">Formats supportés</span></div>
+    <div class="info-row"><b>📑 PDF</b><span>Adobe, navigateurs</span></div>
+    <div class="info-row"><b>📐 DXF</b><span>AutoCAD, Civil 3D, Covadis</span></div>
+    <div class="info-row"><b>🌍 KML</b><span>Google Earth, QGIS</span></div>
+    <div class="info-row"><b>📊 CSV</b><span>Excel, LibreOffice</span></div>
+    <div class="info-row"><b>📋 TXT</b><span>Rapport imprimable</span></div>
+  </div>
+</section>
+
+<footer>© 2025 Qibla Direction Calculator — Developed by <b>NASRAOUI FATHI</b></footer>
+<div class="toast" id="toast"></div>
+
+<!-- INSTALL BANNER -->
+<div id="installBanner">
+  <div class="install-text">
+    <div class="install-text-title">📱 Installer l'application</div>
+    <div class="install-text-sub">Fonctionne hors-ligne comme une vraie app</div>
+  </div>
+  <div class="install-actions">
+    <button class="btn-install" id="installBtn">INSTALLER</button>
+    <button class="btn-dismiss" id="dismissBtn">✖</button>
+  </div>
+</div>
+
+<script>
+// ============ TRANSLATIONS ============
+const I18N = {
+  fr: {
+    appTitle:"Qibla Direction Calculator", appSubtitle:"Great Circle Bearing · UTM Field Stakeout",
+    loginSub:"Accès protégé — Veuillez saisir le mot de passe", loginBtn:"🔓 SE CONNECTER",
+    developedBy:"Developed by", tabInput:"Input", tabResult:"Result", tabMap:"Map",
+    tabStakeout:"Stakeout", tabCompass:"Compass", tabExport:"Export",
+    measurePoint:"Coordonnées du point", modeXY:"X, Y (métrique)", modeGPS:"GPS (Lat/Lng)",
+    projection:"Système de projection", siteName:"Nom du point / Site",
+    captureGPS:"Capture GPS automatique", calculate:"Calculer Qibla",
+    noCalc:"Aucun calcul effectué", enterCoords:"Saisissez vos coordonnées",
+    mapTitle:"Carte interactive", recenter:"Recentrer", satellite:"Satellite/Carte",
+    stakeoutTitle:"Ligne d'implantation", lineLength:"Longueur (m)",
+    stakeSpacing:"Espacement (m)", generateStakeout:"Générer",
+    compassTitle:"Boussole temps réel", currentHeading:"Heading actuel",
+    enableCompass:"Activer boussole", exportTitle:"Export résultats",
+    exportPDF:"Export PDF (avec carte)", exportDXF:"Export DXF (AutoCAD)",
+    exportKML:"Export KML (Google Earth)", exportCSV:"Export CSV (Excel)",
+    exportTXT:"Rapport texte", formatsTitle:"Formats supportés",
+    settings:"⚙️ Paramètres", companyLogo:"Logo société",
+    uploadLogo:"📤 Uploader un logo", companyName:"Nom société",
+    companyInfo:"Infos société", lang:"🌍 Langue", save:"💾 Sauvegarder", close:"✖️ Fermer",
+    qiblaReport:"RAPPORT DE CALCUL QIBLA", azimuthQibla:"AZIMUT QIBLA",
+    siteInfo:"INFORMATIONS DU SITE", coords:"COORDONNÉES GÉOGRAPHIQUES",
+    qiblaDir:"DIRECTION QIBLA", stakePoints:"POINTS D'IMPLANTATION",
+    site:"Site", calcDate:"Date du calcul", distance:"Distance à la Kaaba",
+    direction:"Direction cardinale", azimuth:"Azimut (Great Circle)",
+    kaabaCoords:"Coordonnées Kaaba", mapCapture:"CARTE QIBLA"
+  },
+  en: {
+    appTitle:"Qibla Direction Calculator", appSubtitle:"Great Circle Bearing · UTM Field Stakeout",
+    loginSub:"Protected access — Please enter password", loginBtn:"🔓 LOGIN",
+    developedBy:"Developed by", tabInput:"Input", tabResult:"Result", tabMap:"Map",
+    tabStakeout:"Stakeout", tabCompass:"Compass", tabExport:"Export",
+    measurePoint:"Measurement Point Coordinates", modeXY:"X, Y (metric)", modeGPS:"GPS (Lat/Lng)",
+    projection:"Projection System", siteName:"Point Name / Site",
+    captureGPS:"Capture GPS automatically", calculate:"Calculate Qibla",
+    noCalc:"No calculation", enterCoords:"Enter coordinates",
+    mapTitle:"Interactive Map", recenter:"Recenter", satellite:"Satellite/Map",
+    stakeoutTitle:"Qibla Stakeout Line", lineLength:"Length (m)",
+    stakeSpacing:"Spacing (m)", generateStakeout:"Generate",
+    compassTitle:"Real-time Compass", currentHeading:"Current heading",
+    enableCompass:"Enable compass", exportTitle:"Export results",
+    exportPDF:"Export PDF (with map)", exportDXF:"Export DXF (AutoCAD)",
+    exportKML:"Export KML (Google Earth)", exportCSV:"Export CSV (Excel)",
+    exportTXT:"Text report", formatsTitle:"Supported formats",
+    settings:"⚙️ Settings", companyLogo:"Company logo",
+    uploadLogo:"📤 Upload logo", companyName:"Company name",
+    companyInfo:"Company info", lang:"🌍 Language", save:"💾 Save", close:"✖️ Close",
+    qiblaReport:"QIBLA CALCULATION REPORT", azimuthQibla:"QIBLA AZIMUTH",
+    siteInfo:"SITE INFORMATION", coords:"GEOGRAPHIC COORDINATES",
+    qiblaDir:"QIBLA DIRECTION", stakePoints:"STAKEOUT POINTS",
+    site:"Site", calcDate:"Calculation date", distance:"Distance to Kaaba",
+    direction:"Cardinal direction", azimuth:"Azimuth (Great Circle)",
+    kaabaCoords:"Kaaba coordinates", mapCapture:"QIBLA MAP"
+  },
+  ar: {
+    appTitle:"حاسبة اتجاه القبلة", appSubtitle:"دائرة كبرى · UTM إحداثيات",
+    loginSub:"وصول محمي — أدخل كلمة المرور", loginBtn:"🔓 تسجيل الدخول",
+    developedBy:"تطوير", tabInput:"إدخال", tabResult:"النتيجة", tabMap:"خريطة",
+    tabStakeout:"التخطيط", tabCompass:"بوصلة", tabExport:"تصدير",
+    measurePoint:"إحداثيات نقطة القياس", modeXY:"X, Y (متري)", modeGPS:"GPS",
+    projection:"نظام الإسقاط", siteName:"اسم النقطة",
+    captureGPS:"التقاط GPS تلقائي", calculate:"حساب القبلة",
+    noCalc:"لم يتم الحساب", enterCoords:"أدخل الإحداثيات",
+    mapTitle:"الخريطة التفاعلية", recenter:"إعادة التركيز", satellite:"قمر/خريطة",
+    stakeoutTitle:"خط تخطيط القبلة", lineLength:"الطول (م)",
+    stakeSpacing:"المسافة (م)", generateStakeout:"إنشاء",
+    compassTitle:"بوصلة حية", currentHeading:"الاتجاه الحالي",
+    enableCompass:"تفعيل البوصلة", exportTitle:"تصدير النتائج",
+    exportPDF:"تصدير PDF (مع خريطة)", exportDXF:"تصدير DXF (AutoCAD)",
+    exportKML:"تصدير KML", exportCSV:"تصدير CSV",
+    exportTXT:"تقرير نصي", formatsTitle:"التنسيقات المدعومة",
+    settings:"⚙️ الإعدادات", companyLogo:"شعار الشركة",
+    uploadLogo:"📤 تحميل شعار", companyName:"اسم الشركة",
+    companyInfo:"معلومات الشركة", lang:"🌍 اللغة", save:"💾 حفظ", close:"✖️ إغلاق",
+    qiblaReport:"تقرير حساب القبلة", azimuthQibla:"سمت القبلة",
+    siteInfo:"معلومات الموقع", coords:"الإحداثيات الجغرافية",
+    qiblaDir:"اتجاه القبلة", stakePoints:"نقاط التخطيط",
+    site:"الموقع", calcDate:"تاريخ الحساب", distance:"المسافة إلى الكعبة",
+    direction:"الاتجاه الأصلي", azimuth:"السمت (دائرة كبرى)",
+    kaabaCoords:"إحداثيات الكعبة", mapCapture:"خريطة القبلة"
+  }
+};
+
+let currentLang = localStorage.getItem('qibla_lang') || 'fr';
+
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('qibla_lang', lang);
+  document.getElementById('htmlRoot').setAttribute('lang', lang);
+  if (lang === 'ar') document.body.classList.add('rtl');
+  else document.body.classList.remove('rtl');
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (I18N[lang][key]) el.textContent = I18N[lang][key];
+  });
+  document.querySelectorAll('.lang-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === lang);
+  });
+  const ls = document.getElementById('langSelect');
+  if (ls) ls.value = lang;
+}
+
+// ============ SETTINGS ============
+let appSettings = JSON.parse(localStorage.getItem('qibla_settings') || '{}');
+function loadSettings() {
+  if (appSettings.logo) {
+    document.getElementById('logoPreview').innerHTML = `<img src="${appSettings.logo}">`;
+    document.getElementById('headerLogo').innerHTML = `<img src="${appSettings.logo}">`;
+    document.getElementById('loginLogo').innerHTML = `<img src="${appSettings.logo}">`;
+  }
+  if (appSettings.companyName) document.getElementById('companyName').value = appSettings.companyName;
+  if (appSettings.companyInfo) document.getElementById('companyInfo').value = appSettings.companyInfo;
+}
+function openSettings() { document.getElementById('settingsModal').classList.add('show'); loadSettings(); }
+function closeSettings() { document.getElementById('settingsModal').classList.remove('show'); }
+function saveSettings() {
+  appSettings.companyName = document.getElementById('companyName').value;
+  appSettings.companyInfo = document.getElementById('companyInfo').value;
+  localStorage.setItem('qibla_settings', JSON.stringify(appSettings));
+  loadSettings();
+  closeSettings();
+  toast('✅ Settings saved');
+}
+
+document.getElementById('logoFile').addEventListener('change', (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    appSettings.logo = ev.target.result;
+    localStorage.setItem('qibla_settings', JSON.stringify(appSettings));
+    loadSettings();
+    toast('✅ Logo uploaded');
+  };
+  reader.readAsDataURL(file);
+});
+
+// ============ PASSWORD ============
+const APP_PASSWORD = 'Subtopo@2025';
+const SESSION_KEY = 'qibla_auth_v1';
+
+window.addEventListener('DOMContentLoaded', () => {
+  setLang(currentLang);
+  loadSettings();
+  if (sessionStorage.getItem(SESSION_KEY) === 'ok') {
+    document.getElementById('loginOverlay').classList.add('hidden');
+  } else { document.getElementById('pwdInput').focus(); }
+});
+
+document.getElementById('pwdInput').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') tryLogin();
+});
+
+function tryLogin() {
+  const v = document.getElementById('pwdInput').value;
+  const err = document.getElementById('pwdError');
+  if (v === APP_PASSWORD) {
+    sessionStorage.setItem(SESSION_KEY, 'ok');
+    document.getElementById('loginOverlay').classList.add('hidden');
+    setTimeout(()=>toast('✅ Welcome'), 300);
+  } else {
+    err.textContent = '❌ Wrong password';
+    document.getElementById('pwdInput').value = '';
+    document.getElementById('pwdInput').focus();
+    setTimeout(()=>err.textContent='', 3000);
+  }
+}
+
+function logout() {
+  if (confirm('Logout?')) { sessionStorage.removeItem(SESSION_KEY); location.reload(); }
+}
+
+// ============ APP LOGIC ============
+const KAABA = { lat: 21.4225, lng: 39.8262 };
+let lastResult = null, stakeoutPoints = [];
+let map, satelliteLayer, osmLayer, isSat = false;
+
+function toast(msg, dur=2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+function getUTMProj(zone) {
+  const num = parseInt(zone);
+  const hemi = zone.includes('S') ? ' +south' : '';
+  return `+proj=utm +zone=${num}${hemi} +datum=WGS84 +units=m +no_defs`;
+}
+
+function calculateQiblaBearing(lat, lng) {
+  const f1 = lat*Math.PI/180, f2 = KAABA.lat*Math.PI/180;
+  const dl = (KAABA.lng-lng)*Math.PI/180;
+  const y = Math.sin(dl)*Math.cos(f2);
+  const x = Math.cos(f1)*Math.sin(f2)-Math.sin(f1)*Math.cos(f2)*Math.cos(dl);
+  return ((Math.atan2(y,x)*180/Math.PI)+360)%360;
+}
+
+function distanceToKaaba(lat, lng) {
+  const R=6371, f1=lat*Math.PI/180, f2=KAABA.lat*Math.PI/180;
+  const df=(KAABA.lat-lat)*Math.PI/180, dl=(KAABA.lng-lng)*Math.PI/180;
+  const a=Math.sin(df/2)**2+Math.cos(f1)*Math.cos(f2)*Math.sin(dl/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function bearingToCardinal(b) {
+  const dirs=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  return dirs[Math.round(b/22.5)%16];
+}
+
+function decimalToDMS(deg) {
+  const abs=Math.abs(deg), d=Math.floor(abs), m=Math.floor((abs-d)*60), s=((abs-d)*60-m)*60;
+  return `${d}° ${m}' ${s.toFixed(2)}"`;
+}
+
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById(t.dataset.tab).classList.add('active');
+    if (t.dataset.tab === 'map') setTimeout(initMap, 100);
+  });
+});
+
+document.getElementById('modeXY').addEventListener('click', () => {
+  document.getElementById('modeXY').classList.add('active');
+  document.getElementById('modeGPS').classList.remove('active');
+  document.getElementById('utmFields').style.display='block';
+  document.getElementById('gpsFields').style.display='none';
+});
+document.getElementById('modeGPS').addEventListener('click', () => {
+  document.getElementById('modeGPS').classList.add('active');
+  document.getElementById('modeXY').classList.remove('active');
+  document.getElementById('utmFields').style.display='none';
+  document.getElementById('gpsFields').style.display='block';
+});
+
+document.getElementById('gpsBtn').addEventListener('click', () => {
+  if (!navigator.geolocation) return toast('❌ GPS not supported');
+  toast('📡 GPS capture...');
+  navigator.geolocation.getCurrentPosition(pos => {
+    const { latitude, longitude } = pos.coords;
+    const isGPS = document.getElementById('modeGPS').classList.contains('active');
+    if (isGPS) {
+      document.getElementById('lat').value = latitude.toFixed(6);
+      document.getElementById('lng').value = longitude.toFixed(6);
+    } else {
+      const zone = document.getElementById('utmZone').value;
+      try {
+        const [x,y] = proj4('WGS84', getUTMProj(zone), [longitude, latitude]);
+        document.getElementById('easting').value = x.toFixed(3);
+        document.getElementById('northing').value = y.toFixed(3);
+      } catch(e) { return toast('❌ Projection error'); }
+    }
+    toast(`✅ GPS captured (±${pos.coords.accuracy.toFixed(0)}m)`);
+  }, err => toast('❌ '+err.message), { enableHighAccuracy:true, timeout:10000 });
+});
+
+document.getElementById('calcBtn').addEventListener('click', () => {
+  let lat, lng, x=null, y=null, zone=null;
+  const isGPS = document.getElementById('modeGPS').classList.contains('active');
+  if (isGPS) {
+    lat = parseFloat(document.getElementById('lat').value);
+    lng = parseFloat(document.getElementById('lng').value);
+    if (isNaN(lat)||isNaN(lng)) return toast('❌ Invalid Lat/Lng');
+  } else {
+    x = parseFloat(document.getElementById('easting').value);
+    y = parseFloat(document.getElementById('northing').value);
+    zone = document.getElementById('utmZone').value;
+    if (isNaN(x)||isNaN(y)) return toast('❌ Invalid coords');
+    try { const r = proj4(getUTMProj(zone), 'WGS84', [x,y]); lng=r[0]; lat=r[1]; }
+    catch(e) { return toast('❌ Projection error'); }
+  }
+  if (isGPS) {
+    zone = document.getElementById('utmZone').value;
+    try { const r = proj4('WGS84', getUTMProj(zone), [lng,lat]); x=r[0]; y=r[1]; } catch(e){}
+  }
+  
+  const bearing = calculateQiblaBearing(lat, lng);
+  const dist = distanceToKaaba(lat, lng);
+  const cardinal = bearingToCardinal(bearing);
+  const site = document.getElementById('siteName').value || '—';
+  
+  lastResult = { lat, lng, x, y, zone, bearing, dist, cardinal, site, date: new Date().toISOString() };
+  const T = I18N[currentLang];
+  
+  document.getElementById('resultContent').innerHTML = `
+    <div class="qibla-big">
+      <div class="qibla-angle">${bearing.toFixed(2)}°</div>
+      <div class="qibla-label">${T.azimuthQibla} · ${cardinal}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">📊 ${T.siteInfo}</div>
+      <div class="result-grid">
+        <div class="result-item full"><div class="result-label">📍 ${T.site}</div><div class="result-value">${site}</div></div>
+        <div class="result-item"><div class="result-label">Latitude</div>
+          <div class="result-value">${lat.toFixed(6)}°</div>
+          <div class="result-sub">${decimalToDMS(lat)} ${lat>=0?'N':'S'}</div></div>
+        <div class="result-item"><div class="result-label">Longitude</div>
+          <div class="result-value">${lng.toFixed(6)}°</div>
+          <div class="result-sub">${decimalToDMS(lng)} ${lng>=0?'E':'W'}</div></div>
+        <div class="result-item"><div class="result-label">X Easting</div>
+          <div class="result-value">${x?x.toFixed(3):'-'}</div>
+          <div class="result-sub">${zone||'-'}</div></div>
+        <div class="result-item"><div class="result-label">Y Northing</div>
+          <div class="result-value">${y?y.toFixed(3):'-'}</div>
+          <div class="result-sub">UTM</div></div>
+        <div class="result-item"><div class="result-label">🕋 ${T.distance}</div>
+          <div class="result-value">${dist.toFixed(1)} km</div>
+          <div class="result-sub">${(dist*0.621371).toFixed(1)} miles</div></div>
+        <div class="result-item"><div class="result-label">🧭 ${T.direction}</div>
+          <div class="result-value">${cardinal}</div>
+          <div class="result-sub">${bearing.toFixed(4)}°</div></div>
+        <div class="result-item full"><div class="result-label">📅 ${T.calcDate}</div>
+          <div class="result-value" style="font-size:14px;">${new Date().toLocaleString()}</div></div>
+      </div>
+    </div>`;
+  
+  document.getElementById('qiblaArrow').style.transform = `translate(-50%,-180px) rotate(${bearing}deg)`;
+  toast('✅ Qibla calculated');
+  document.querySelector('[data-tab="result"]').click();
+});
+
+document.getElementById('enableCompass').addEventListener('click', async () => {
+  const status = document.getElementById('compassStatus');
+  try {
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      const p = await DeviceOrientationEvent.requestPermission();
+      if (p !== 'granted') { status.innerHTML='<div class="status status-warning">⚠️ Permission denied</div>'; return; }
+    }
+    const handler = e => {
+      let heading = e.webkitCompassHeading !== undefined ? e.webkitCompassHeading : (360-(e.alpha||0));
+      document.getElementById('compassDisc').style.transform = `rotate(${-heading}deg)`;
+      document.getElementById('headingValue').textContent = `${heading.toFixed(0)}°`;
+    };
+    window.addEventListener('deviceorientationabsolute', handler, true);
+    window.addEventListener('deviceorientation', handler, true);
+    status.innerHTML='<div class="status status-success">✅ Compass active</div>';
+    toast('🧭 Compass enabled');
+  } catch(e) { status.innerHTML='<div class="status status-warning">⚠️ Not supported</div>'; }
+});
+
+// MAP
+function initMap() {
+  if (!lastResult) {
+    document.getElementById('mapView').innerHTML = '<div class="empty" style="padding-top:200px;"><span>🗺️</span><p>Calculate first</p></div>';
+    return;
+  }
+  if (map) { map.remove(); map = null; }
+  
+  map = L.map('mapView').setView([lastResult.lat, lastResult.lng], 6);
+  osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution:'© OpenStreetMap', maxZoom:19, crossOrigin:true
+  }).addTo(map);
+  satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution:'© Esri', maxZoom:19, crossOrigin:true
+  });
+  
+  const myIcon = L.divIcon({
+    html:'<div style="background:#10b981;border:3px solid #fff;border-radius:50%;width:24px;height:24px;box-shadow:0 0 0 4px rgba(16,185,129,.4);"></div>',
+    className:'', iconSize:[24,24], iconAnchor:[12,12]
+  });
+  L.marker([lastResult.lat, lastResult.lng], {icon:myIcon}).addTo(map)
+    .bindPopup(`<b>📍 ${lastResult.site}</b><br>Qibla: ${lastResult.bearing.toFixed(2)}°`);
+  
+  const kaabaIcon = L.divIcon({
+    html:'<div style="font-size:32px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5));">🕋</div>',
+    className:'', iconSize:[32,32], iconAnchor:[16,16]
+  });
+  L.marker([KAABA.lat, KAABA.lng], {icon:kaabaIcon}).addTo(map).bindPopup('<b>🕋 Kaaba</b>');
+  
+  const points = getGreatCirclePoints(lastResult.lat, lastResult.lng, KAABA.lat, KAABA.lng, 100);
+  L.polyline(points, { color:'#10b981', weight:5, opacity:.9 }).addTo(map);
+  L.polyline(points, { color:'#fff', weight:2, opacity:.8, dashArray:'8,8' }).addTo(map);
+  
+  map.fitBounds([[lastResult.lat,lastResult.lng],[KAABA.lat,KAABA.lng]], { padding:[40,40] });
+  setTimeout(()=>map.invalidateSize(), 200);
+}
+
+function getGreatCirclePoints(lat1,lng1,lat2,lng2,n) {
+  const pts=[]; const f1=lat1*Math.PI/180, l1=lng1*Math.PI/180;
+  const f2=lat2*Math.PI/180, l2=lng2*Math.PI/180;
+  const d=2*Math.asin(Math.sqrt(Math.sin((f2-f1)/2)**2+Math.cos(f1)*Math.cos(f2)*Math.sin((l2-l1)/2)**2));
+  for(let i=0;i<=n;i++){
+    const f=i/n;
+    const A=Math.sin((1-f)*d)/Math.sin(d), B=Math.sin(f*d)/Math.sin(d);
+    const x=A*Math.cos(f1)*Math.cos(l1)+B*Math.cos(f2)*Math.cos(l2);
+    const y=A*Math.cos(f1)*Math.sin(l1)+B*Math.cos(f2)*Math.sin(l2);
+    const z=A*Math.sin(f1)+B*Math.sin(f2);
+    pts.push([Math.atan2(z,Math.sqrt(x*x+y*y))*180/Math.PI, Math.atan2(y,x)*180/Math.PI]);
+  }
+  return pts;
+}
+
+function recenterMap() { if (map && lastResult) map.setView([lastResult.lat, lastResult.lng], 15); }
+function toggleSatellite() {
+  if (!map) return;
+  isSat = !isSat;
+  if (isSat) { map.removeLayer(osmLayer); map.addLayer(satelliteLayer); toast('🛰️ Satellite'); }
+  else { map.removeLayer(satelliteLayer); map.addLayer(osmLayer); toast('🗺️ Map'); }
+}
+
+// STAKEOUT
+function generateStakeout() {
+  if (!lastResult) return toast('❌ Calculate first');
+  if (!lastResult.x || !lastResult.y) return toast('❌ UTM coords missing');
+  const length = parseFloat(document.getElementById('stakeLength').value);
+  const step = parseFloat(document.getElementById('stakeStep').value);
+  if (length<=0 || step<=0 || step>length) return toast('❌ Invalid params');
+  
+  const theta = lastResult.bearing * Math.PI / 180;
+  stakeoutPoints = [];
+  let n = 0;
+  for (let d = 0; d <= length; d += step) {
+    const px = lastResult.x + Math.sin(theta) * d;
+    const py = lastResult.y + Math.cos(theta) * d;
+    let lat=null, lng=null;
+    try { const r = proj4(getUTMProj(lastResult.zone), 'WGS84', [px, py]); lng=r[0]; lat=r[1]; } catch(e){}
+    stakeoutPoints.push({ n, dist:d, x:px, y:py, lat, lng });
+    n++;
+  }
+  
+  let html = `
+    <div class="info-row"><b>📍 Start</b><span>P0 (${lastResult.x.toFixed(2)}, ${lastResult.y.toFixed(2)})</span></div>
+    <div class="info-row"><b>🧭 Azimuth</b><span>${lastResult.bearing.toFixed(4)}°</span></div>
+    <div class="info-row"><b>📏 Length</b><span>${length} m</span></div>
+    <div class="info-row"><b>🔢 Stakes</b><span>${stakeoutPoints.length}</span></div>
+    <div class="info-row"><b>📐 Spacing</b><span>${step} m</span></div>
+    <div style="overflow-x:auto;"><table class="stakeout-table">
+      <thead><tr><th>N°</th><th>Dist</th><th>X (E)</th><th>Y (N)</th><th>Lat</th><th>Lng</th></tr></thead><tbody>`;
+  stakeoutPoints.forEach(p => {
+    html += `<tr><td><b>P${p.n}</b></td><td>${p.dist.toFixed(1)}</td><td>${p.x.toFixed(3)}</td><td>${p.y.toFixed(3)}</td><td>${p.lat?p.lat.toFixed(6):'-'}</td><td>${p.lng?p.lng.toFixed(6):'-'}</td></tr>`;
+  });
+  html += `</tbody></table></div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px;">
+      <button class="btn btn-primary btn-sm" onclick="exportStakeout('csv')">📊 CSV</button>
+      <button class="btn btn-outline btn-sm" onclick="exportStakeout('dxf')">📐 DXF</button>
+    </div>`;
+  document.getElementById('stakeoutResult').innerHTML = html;
+  toast(`✅ ${stakeoutPoints.length} stakes`);
+}
+
+function exportStakeout(format) {
+  if (!stakeoutPoints.length) return toast('❌ No stakeout');
+  let content, filename, mime;
+  if (format === 'csv') {
+    content = 'Point,Distance(m),X_Easting,Y_Northing,Latitude,Longitude\n';
+    stakeoutPoints.forEach(p => {
+      content += `P${p.n},${p.dist.toFixed(2)},${p.x.toFixed(3)},${p.y.toFixed(3)},${p.lat?p.lat.toFixed(6):''},${p.lng?p.lng.toFixed(6):''}\n`;
+    });
+    filename=`stakeout-${Date.now()}.csv`; mime='text/csv';
+  } else if (format === 'dxf') {
+    content = generateDXF(stakeoutPoints, true);
+    filename=`stakeout-${Date.now()}.dxf`; mime='application/dxf';
+  }
+  downloadFile(content, filename, mime);
+  toast(`✅ ${format.toUpperCase()} OK`);
+}
+
+function generateDXF(points, isStakeout=false) {
+  let dxf = '0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n0\nENDSEC\n';
+  dxf += '0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n3\n';
+  dxf += '0\nLAYER\n2\nQIBLA\n70\n0\n62\n3\n6\nCONTINUOUS\n';
+  dxf += '0\nLAYER\n2\nPOINTS\n70\n0\n62\n1\n6\nCONTINUOUS\n';
+  dxf += '0\nLAYER\n2\nTEXT\n70\n0\n62\n7\n6\nCONTINUOUS\n';
+  dxf += '0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n';
+  if (isStakeout && points.length > 1) {
+    dxf += '0\nPOLYLINE\n8\nQIBLA\n66\n1\n10\n0\n20\n0\n30\n0\n70\n0\n';
+    points.forEach(p => { dxf += `0\nVERTEX\n8\nQIBLA\n10\n${p.x.toFixed(3)}\n20\n${p.y.toFixed(3)}\n30\n0\n`; });
+    dxf += '0\nSEQEND\n';
+    points.forEach(p => {
+      dxf += `0\nPOINT\n8\nPOINTS\n10\n${p.x.toFixed(3)}\n20\n${p.y.toFixed(3)}\n30\n0\n`;
+      dxf += `0\nTEXT\n8\nTEXT\n10\n${(p.x+0.5).toFixed(3)}\n20\n${(p.y+0.5).toFixed(3)}\n30\n0\n40\n1.0\n1\nP${p.n} (${p.dist.toFixed(1)}m)\n`;
+      dxf += `0\nCIRCLE\n8\nPOINTS\n10\n${p.x.toFixed(3)}\n20\n${p.y.toFixed(3)}\n30\n0\n40\n0.3\n`;
+    });
+  } else if (lastResult) {
+    const theta = lastResult.bearing*Math.PI/180;
+    const ex = lastResult.x + Math.sin(theta)*30, ey = lastResult.y + Math.cos(theta)*30;
+    dxf += `0\nLINE\n8\nQIBLA\n10\n${lastResult.x.toFixed(3)}\n20\n${lastResult.y.toFixed(3)}\n30\n0\n11\n${ex.toFixed(3)}\n21\n${ey.toFixed(3)}\n31\n0\n`;
+    dxf += `0\nPOINT\n8\nPOINTS\n10\n${lastResult.x.toFixed(3)}\n20\n${lastResult.y.toFixed(3)}\n30\n0\n`;
+    dxf += `0\nCIRCLE\n8\nPOINTS\n10\n${lastResult.x.toFixed(3)}\n20\n${lastResult.y.toFixed(3)}\n30\n0\n40\n0.5\n`;
+    dxf += `0\nTEXT\n8\nTEXT\n10\n${(lastResult.x+1).toFixed(3)}\n20\n${(lastResult.y+1).toFixed(3)}\n30\n0\n40\n1.5\n1\n${lastResult.site}\n`;
+    dxf += `0\nTEXT\n8\nTEXT\n10\n${(ex+1).toFixed(3)}\n20\n${(ey+1).toFixed(3)}\n30\n0\n40\n1.0\n1\nQibla ${lastResult.bearing.toFixed(2)} deg\n`;
+  }
+  dxf += '0\nENDSEC\n0\nEOF\n';
+  return dxf;
+}
+
+function downloadFile(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// PDF EXPORT
+async function captureMapImage() {
+  return new Promise(async (resolve) => {
+    const mapPanel = document.getElementById('map');
+    const wasActive = mapPanel.classList.contains('active');
+    const currentActive = document.querySelector('.tab.active').dataset.tab;
+    if (!wasActive) {
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      mapPanel.classList.add('active');
+    }
+    initMap();
+    await new Promise(r => setTimeout(r, 1500));
+    try {
+      const canvas = await html2canvas(document.getElementById('mapView'), {
+        useCORS: true, allowTaint: true, logging: false, scale: 1.5
+      });
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    } catch(e) { console.warn('Map capture failed', e); resolve(null); }
+    finally {
+      if (!wasActive) {
+        document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+        document.getElementById(currentActive).classList.add('active');
+      }
+    }
+  });
+}
+
+async function exportPDF() {
+  if (!lastResult) return toast('❌ No result');
+  toast('📸 Generating PDF...');
+  const T = I18N[currentLang];
+  const r = lastResult;
+  const mapImg = await captureMapImage();
+  
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const emerald=[16,185,129], dark=[10,46,42], soft=[167,243,208];
+  
+  doc.setFillColor(...dark);
+  doc.rect(0, 0, 210, 35, 'F');
+  doc.setFillColor(...emerald);
+  doc.rect(0, 35, 210, 2, 'F');
+  
+  if (appSettings.logo) {
+    try { doc.addImage(appSettings.logo, 'PNG', 15, 8, 20, 20); }
+    catch(e) {
+      doc.setFillColor(255,255,255);
+      doc.roundedRect(15, 8, 20, 20, 3, 3, 'F');
+    }
+  } else {
+    doc.setFillColor(255,255,255);
+    doc.roundedRect(15, 8, 20, 20, 3, 3, 'F');
+    doc.setFontSize(14); doc.setTextColor(...dark); doc.text('Q', 22, 22);
+  }
+  
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(16); doc.setFont('helvetica','bold');
+  doc.text(appSettings.companyName || 'QIBLA DIRECTION CALCULATOR', 42, 16);
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.setTextColor(...soft);
+  doc.text(appSettings.companyInfo || 'Great Circle Bearing - UTM Field Stakeout', 42, 22);
+  doc.setFontSize(8);
+  doc.text('Developed by NASRAOUI FATHI', 42, 28);
+  
+  let y = 48;
+  doc.setTextColor(...dark);
+  doc.setFontSize(14); doc.setFont('helvetica','bold');
+  doc.text(T.qiblaReport, 105, y, { align:'center' });
+  y += 5;
+  doc.setDrawColor(...emerald); doc.setLineWidth(0.5);
+  doc.line(50, y, 160, y);
+  y += 8;
+  
+  doc.setFillColor(240,253,250);
+  doc.setDrawColor(...emerald); doc.setLineWidth(0.8);
+  doc.roundedRect(20, y, 170, 28, 3, 3, 'FD');
+  doc.setFontSize(28); doc.setTextColor(...emerald); doc.setFont('helvetica','bold');
+  doc.text(`${r.bearing.toFixed(2)}°`, 105, y+14, { align:'center' });
+  doc.setFontSize(9); doc.setTextColor(...dark); doc.setFont('helvetica','normal');
+  doc.text(`${T.azimuthQibla}  -  ${r.cardinal}`, 105, y+22, { align:'center' });
+  y += 36;
+  
+  const drawSection = (title) => {
+    doc.setFillColor(...dark);
+    doc.rect(20, y, 170, 6, 'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont('helvetica','bold');
+    doc.text(title, 25, y+4);
+    y += 10;
+  };
+  const drawRow = (label, value) => {
+    doc.setFontSize(8); doc.setTextColor(100,100,100); doc.setFont('helvetica','bold');
+    doc.text(label, 25, y);
+    doc.setTextColor(...dark); doc.setFont('helvetica','normal');
+    doc.text(String(value), 90, y);
+    y += 5;
+  };
+  
+  drawSection(T.siteInfo);
+  drawRow(T.site + ' :', r.site);
+  drawRow(T.calcDate + ' :', new Date(r.date).toLocaleString());
+  y += 3;
+  
+  drawSection(T.coords);
+  drawRow('Latitude :', `${r.lat.toFixed(6)}° (${decimalToDMS(r.lat)} ${r.lat>=0?'N':'S'})`);
+  drawRow('Longitude :', `${r.lng.toFixed(6)}° (${decimalToDMS(r.lng)} ${r.lng>=0?'E':'W'})`);
+  if (r.x && r.y) {
+    drawRow('X Easting :', `${r.x.toFixed(3)} m`);
+    drawRow('Y Northing :', `${r.y.toFixed(3)} m`);
+    drawRow('Projection :', `UTM Zone ${r.zone}`);
+  }
+  y += 3;
+  
+  drawSection(T.qiblaDir);
+  drawRow(T.azimuth + ' :', `${r.bearing.toFixed(4)}°`);
+  drawRow(T.direction + ' :', r.cardinal);
+  drawRow(T.distance + ' :', `${r.dist.toFixed(2)} km (${(r.dist*0.621371).toFixed(2)} miles)`);
+  drawRow(T.kaabaCoords + ' :', `21.4225° N, 39.8262° E`);
+  y += 5;
+  
+  if (mapImg) {
+    if (y > 180) { doc.addPage(); y = 20; }
+    drawSection('Map ' + T.mapCapture);
+    try { doc.addImage(mapImg, 'JPEG', 20, y, 170, 90); y += 95; }
+    catch(e) { console.warn('Cannot embed map'); }
+  }
+  
+  if (stakeoutPoints.length > 0) {
+    if (y > 220) { doc.addPage(); y = 20; }
+    drawSection(`${T.stakePoints} (${stakeoutPoints.length})`);
+    doc.setFillColor(240,253,250);
+    doc.rect(20, y, 170, 6, 'F');
+    doc.setFontSize(8); doc.setTextColor(...dark); doc.setFont('helvetica','bold');
+    doc.text('Pt', 25, y+4); doc.text('Dist(m)', 45, y+4);
+    doc.text('X Easting', 75, y+4); doc.text('Y Northing', 110, y+4);
+    doc.text('Latitude', 145, y+4); doc.text('Longitude', 170, y+4);
+    y += 6;
+    doc.setFont('helvetica','normal'); doc.setFontSize(7);
+    stakeoutPoints.forEach((p, idx) => {
+      if (y > 280) { doc.addPage(); y = 20; }
+      if (idx % 2 === 0) { doc.setFillColor(248,250,250); doc.rect(20, y, 170, 5, 'F'); }
+      doc.setTextColor(...dark);
+      doc.text(`P${p.n}`, 25, y+3.5);
+      doc.text(p.dist.toFixed(1), 45, y+3.5);
+      doc.text(p.x.toFixed(3), 75, y+3.5);
+      doc.text(p.y.toFixed(3), 110, y+3.5);
+      doc.text(p.lat?p.lat.toFixed(6):'-', 145, y+3.5);
+      doc.text(p.lng?p.lng.toFixed(6):'-', 170, y+3.5);
+      y += 5;
+    });
+  }
+  
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFillColor(...dark);
+    doc.rect(0, 287, 210, 10, 'F');
+    doc.setFontSize(7); doc.setTextColor(...soft);
+    const footerText = (appSettings.companyName || '© 2025 Qibla Direction Calculator') + ' - Developed by NASRAOUI FATHI';
+    doc.text(footerText, 105, 293, { align:'center' });
+    doc.text(`Page ${i}/${pageCount}`, 195, 293, { align:'right' });
+  }
+  
+  doc.save(`qibla-report-${Date.now()}.pdf`);
+  toast('✅ PDF generated');
+}
+
+function exportData(format) {
+  if (!lastResult) return toast('❌ No result');
+  if (format === 'pdf') return exportPDF();
+  
+  let content, filename, mime; const r = lastResult;
+  switch(format) {
+    case 'csv':
+      content = `Site,Latitude,Longitude,X_Easting,Y_Northing,Zone,Bearing,Cardinal,Distance_km,Date\n"${r.site}",${r.lat},${r.lng},${r.x||''},${r.y||''},${r.zone||''},${r.bearing.toFixed(4)},${r.cardinal},${r.dist.toFixed(2)},${r.date}`;
+      filename=`qibla-${Date.now()}.csv`; mime='text/csv'; break;
+    case 'kml':
+      let stakeKml = '';
+      if (stakeoutPoints.length) {
+        stakeKml = `<Folder><name>Stakeout</name>`;
+        stakeoutPoints.forEach(p => { if (p.lat && p.lng) stakeKml += `<Placemark><name>P${p.n}</name><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`; });
+        stakeKml += `</Folder>`;
+      }
+      content = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${r.site}</name>
+<Placemark><name>${r.site}</name><Point><coordinates>${r.lng},${r.lat},0</coordinates></Point></Placemark>
+<Placemark><name>Kaaba</name><Point><coordinates>${KAABA.lng},${KAABA.lat},0</coordinates></Point></Placemark>
+<Placemark><LineString><tessellate>1</tessellate><coordinates>${r.lng},${r.lat},0 ${KAABA.lng},${KAABA.lat},0</coordinates></LineString></Placemark>
+${stakeKml}</Document></kml>`;
+      filename=`qibla-${Date.now()}.kml`; mime='application/vnd.google-earth.kml+xml'; break;
+    case 'dxf':
+      content = generateDXF(stakeoutPoints.length ? stakeoutPoints : [], stakeoutPoints.length>0);
+      filename=`qibla-${Date.now()}.dxf`; mime='application/dxf'; break;
+    case 'txt':
+      let st = '';
+      if (stakeoutPoints.length) {
+        st = '\n\nSTAKEOUT\n────────────\n';
+        stakeoutPoints.forEach(p => {
+          st += `P${p.n} | ${p.dist.toFixed(1)}m | X=${p.x.toFixed(3)} | Y=${p.y.toFixed(3)}\n`;
+        });
+      }
+      content = `═══════════════════════════════
+QIBLA DIRECTION REPORT
+═══════════════════════════════
+Site:        ${r.site}
+Date:        ${new Date(r.date).toLocaleString()}
+Latitude:    ${r.lat.toFixed(6)}°
+Longitude:   ${r.lng.toFixed(6)}°
+X Easting:   ${r.x?r.x.toFixed(3):'-'} m
+Y Northing:  ${r.y?r.y.toFixed(3):'-'} m
+Projection:  ${r.zone||'-'}
+Azimuth:     ${r.bearing.toFixed(4)}°
+Cardinal:    ${r.cardinal}
+Distance:    ${r.dist.toFixed(2)} km${st}
+═══════════════════════════════
+Developed by NASRAOUI FATHI`;
+      filename=`qibla-${Date.now()}.txt`; mime='text/plain'; break;
+  }
+  downloadFile(content, filename, mime);
+  toast(`✅ ${format.toUpperCase()} OK`);
+}
+
+// ============ PWA INSTALLATION ============
+let deferredPrompt = null;
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('✅ SW registered:', reg.scope))
+      .catch(err => console.error('❌ SW error:', err));
+  });
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  if (localStorage.getItem('install_dismissed') !== 'true') {
+    setTimeout(() => {
+      document.getElementById('installBanner').classList.add('show');
+    }, 5000);
+  }
+});
+
+document.getElementById('installBtn').addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  if (outcome === 'accepted') {
+    document.getElementById('installBanner').classList.remove('show');
+    toast('✅ App installée');
+  }
+  deferredPrompt = null;
+});
+
+document.getElementById('dismissBtn').addEventListener('click', () => {
+  document.getElementById('installBanner').classList.remove('show');
+  localStorage.setItem('install_dismissed', 'true');
+});
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('installBanner').classList.remove('show');
+  toast('🎉 App installée avec succès');
+});
+
+// iOS Install Hint
+if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream && !window.navigator.standalone) {
+  setTimeout(() => {
+    const banner = document.getElementById('installBanner');
+    banner.innerHTML = `
+      <div class="install-text">
+        <div class="install-text-title">📱 Installer sur iPhone</div>
+        <div class="install-text-sub">Tapez sur 📤 puis "Sur l'écran d'accueil"</div>
+      </div>
+      <div class="install-actions">
+        <button class="btn-dismiss" onclick="this.closest('#installBanner').classList.remove('show')">OK</button>
+      </div>
+    `;
+    banner.classList.add('show');
+  }, 5000);
+}
+</script>
+</body>
+</html>
